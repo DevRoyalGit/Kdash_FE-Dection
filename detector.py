@@ -1,24 +1,42 @@
+#FOR DETECTION OF KDASH -> 
+# python detector.py kdash
+# python detector.py tripper
+
 # Records will be pulled one by one and detected and stored in the DB
 import mysql.connector
-# from datetime import datetime
-# from IPython.core.display import Video
 import torch
 import base64   
-# import cv2
-# import numpy as np
-# import torchvision.models as models
-# import torchvision.transforms as transforms
-# from io import BytesIO
 import json
 import pandas as pd
 from PIL import Image
+import sys
+
+
+possible_args = {
+    'kdash': 'kdash',
+    'tripper':'tripper'
+}
+
+current_detection_mode = possible_args['tripper']
+
+if(len(sys.argv) > 1 and sys.argv[1] == possible_args['kdash']):
+    current_detection_mode = possible_args['kdash']
+
+print('## DETECTION INITIATED . MODE = ',current_detection_mode)
+
+
+isKdash = current_detection_mode == possible_args['kdash']
 # prefix = "data:image/png;base64,"
 # b64 =  ""
 
 
+model = None
 
+if(isKdash):
+    model = torch.hub.load('yolov5', 'custom', path='yolov5/best.pt', source='local')#kdashmodel
+else:
+    model = torch.hub.load('yolov5', 'custom', path='yolov5/best_tripper.pt', source='local')#local repo
 
-model = torch.hub.load('yolov5', 'custom', path='yolov5/best.pt', source='local')#local repo
 # decoded_data=base64.b64decode((im))
 # res = model(decoded_data)
 # encodd = b64.encode('ascii')
@@ -34,8 +52,48 @@ model = torch.hub.load('yolov5', 'custom', path='yolov5/best.pt', source='local'
 #     print("TO BE IMPLEMENTED")
 #     return result
 
+#Tripper Parsing logic 
+def results_parser_tripper(results):# fucntion for parsing the model obj to string 
+    text = ['text_1','text_2']
+    tripper = ['Tripper_pod']
+
+    symbols = list(filter(lambda n: n['name'] not in tripper and n['name'] not in text, results))
+    texts = list(filter(lambda n:  n['name'] in text, results))
+    trippers = list(filter(lambda n:  n['name'] in tripper, results))
+    
+    symbols.sort(key = lambda x: x['confidence'])
+    texts.sort(key = lambda x: x['confidence'])
+    trippers.sort(key = lambda x: x['confidence'])
+
+    symbols = symbols[0:2]
+    texts = texts[0:2]
+    tripper = trippers[0]['name']
+
+    symbols.sort(key = lambda x: x['xmin'])
+    texts.sort(key = lambda x: x['ymin'])
+    
+    primary_image = symbols[0]['name'] if len(symbols) >= 1 else ''
+    Secondary_image = symbols[1]['name'] if len(symbols) >= 2 else ''
+    text_1 =  texts[0]['name'] if len(texts) >= 1 else ''
+    text_2 = texts[1]['name'] if len(texts) >= 2 else ''
+
+    return {
+        'primary_image':primary_image,
+       'Secondary_image': Secondary_image,
+      'text_1': text_1,
+     'text_2': text_2,
+    'tripper': tripper
+      }
+    # print('Primary ',primary_image['name'])
+    # print('Secondary ',Secondary_image['name'])
+    # print('Text1 ',text_1['name'])
+    # print('Text2 ',text_2['name'])
+    # print('Tripper ',tripper['name'])
+
+
 def results_parser(results):# fucntion for parsing the model obj to string 
     text = ['text_1']
+    
     tripper = ['Tripper_pod']
 
     symbols = list(filter(lambda n: n['name'] not in tripper and n['name'] not in text, results))
@@ -52,16 +110,21 @@ def results_parser(results):# fucntion for parsing the model obj to string
 
     symbols.sort(key = lambda x: x['xmin'])
     texts.sort(key = lambda x: x['ymin'])
+
+
+    primary_image = symbols[0]['name'] if len(symbols) >= 1 else ''
+    Secondary_image = symbols[1]['name'] if len(symbols) >= 2 else ''
+    text_1 =  texts[0]['name'] if len(texts) >= 1 else ''
     
-    primary_image,Secondary_image = symbols
-    text_1 = texts[0]
+    
+   
 
     return {
-        'primary_image':primary_image['name'],
-       'Secondary_image': Secondary_image['name'],
-      'text_1': text_1['name'],
-    #  'text_2': text_2['name'],
-    #  'tripper': tripper['name']
+        'primary_image':primary_image,
+       'Secondary_image': Secondary_image,
+       'text_1': text_1,
+    #  'text_2': text_2,
+    #  'tripper': tripper
       }
     # print('Primary ',primary_image['name'])
     # print('Secondary ',Secondary_image['name'])
@@ -70,7 +133,7 @@ def results_parser(results):# fucntion for parsing the model obj to string
     # print('Tripper ',tripper['name'])
 
 
-def predict(image,fname):
+def predict(image,fname):# main function for the predict 
     print('na',fname)
     path = 'test/' + fname
     torch.hub.download_url_to_file(image,path)
@@ -115,8 +178,7 @@ def fetch_all():
             # item[6] = image
             # item[7] = trip_id
             # item[8] = is_decoded
-            
-            # id,time,image,trip_id,is_decoded = item
+
             
             print("id",item[0])
             print("Time_stamp",item[1])
@@ -128,21 +190,31 @@ def fetch_all():
           
 
             print('## ',result)
-            str_res=results_parser(result)
-            # print(str_res)
-            # print(str_res['primary_image'])
-            # str_res['Secondary_image']
-            # str_res['text_1']
-            # str_res['text_2']
-            # str_res['tripper']
-            sql_push = "UPDATE  kdash_raw SET Primary_image = %s, Secondary_image = %s, text_1 = %s, is_decoded = %s where id = " + str(id)
-            val = (
-                str_res['primary_image'],
-                str_res['Secondary_image'],
-                str_res['text_1'],
-                True,
-            )
+
+            str_res = {}
+            if(isKdash):
+                str_res=results_parser(result)
+                sql_push = "UPDATE  kdash_raw SET Primary_image = %s, Secondary_image = %s, text_1 = %s, is_decoded = %s where id = " + str(id)
+                val = (
+                    str_res['primary_image'],
+                    str_res['Secondary_image'],
+                    str_res['text_1'],
+                    True,
+                )
+            else:
+                str_res = results_parser_tripper(result)#tripper response
+                sql_push = "UPDATE  tripper_raw SET Primary_image = %s, Secondary_image = %s, text_1 = %s,text_2 = %s, is_decoded = %s where id = " + str(id)
+                val = (
+                    str_res['primary_image'],
+                    str_res['Secondary_image'],
+                    str_res['text_1'],
+                    str_res['text_2'],
+                    True,
+                )
+           
             cursor.execute(sql_push,val)
+           
+
             
             # str_res=str_res.split(',')
             # print(str_res)

@@ -1,7 +1,7 @@
     // BACKEND
 const cors = require('cors')
 const path = require('path')
-const {savedata, createTrip,savegmmdata,saveG_maps,saveKdashdata}= require("./db.js")
+const {savedata, createTrip,savegmmdata,saveG_maps,saveKdashdata,savetripperdata}= require("./db.js")
 
 
 const express=require("express")
@@ -48,6 +48,11 @@ app.post("/api/gmaps", async (req,res)=>{
 // for the kdash
 app.post("/api/kdash/images", async (req,res)=>{
     const result = await saveKdashdata(req.body)
+    res.send(result)
+
+})
+app.post("/api/tripper/images", async (req,res)=>{
+    const result = await savetripperdata(req.body)
     res.send(result)
 
 })

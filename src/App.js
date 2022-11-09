@@ -11,6 +11,7 @@ class App extends React.Component {
     this.state = {
       Count: 0,
       isRunning: false,
+      isKdash: false
     };
     this.webcamRef = React.createRef(null);
   }
@@ -27,7 +28,8 @@ class App extends React.Component {
         trip_id,
       };
 
-      const response = await fetch(baseUrl + "/api/kdash/images", {
+      const url =  `/api/${this.state.isKdash ?  'kdash':'tripper'}/images` 
+      const response = await fetch(baseUrl + url, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
@@ -153,6 +155,27 @@ class App extends React.Component {
                   Stop
                 </button>
               )}
+
+                <button
+                  type="button"
+                  className="btn mx-1 text-center"
+                  style={{
+                    backgroundColor: this.state.isKdash ? 'blue' : 'gray'
+                  }}
+                  onClick={() => this.setState({isKdash:true})}
+                >
+                  KDASH
+                </button> 
+                <button
+                  type="button"
+                  className="btn mx-1 text-center"
+                  style={{
+                    backgroundColor: !this.state.isKdash ? 'blue' : 'gray'
+                  }}
+                  onClick={() => this.setState({isKdash:false})}
+                >
+                  TRIPPER
+                </button>
 
               <p className={"day-text"}> Uploaded: {this.state.Count}</p>
             </div>

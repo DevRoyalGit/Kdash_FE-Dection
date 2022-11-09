@@ -117,6 +117,34 @@ module.exports.saveKdashdata = async ({
 };
 
 
+// for the tripper images to be stored
+module.exports.savetripperdata = async ({
+  trip_id,
+  data: Image,
+  Datetime
+}) => {
+  try{
+  const dateTimeSql = moment(Datetime).format('YYYY-MM-DD HH:mm:ss');
+  const query = `
+  insert into 
+  tripper_raw (Time_stamp,Image,trip_id)
+  VALUES ('${dateTimeSql}','${Image}','${trip_id}');`
+  return new Promise((resolve, reject) => {
+    connection.query(query, (error, results, fields) => {
+      // console.log(error, results, fields);
+      if (error) reject(error);
+
+      // console.log("The solution is: ", results);
+      resolve(results);
+    });
+  });
+
+}catch(err){
+  console.log('#err ',err);
+}
+};
+
+
 connection.connect(function (err) {
   if (err) {
     console.error("error connecting: " + err.stack);
